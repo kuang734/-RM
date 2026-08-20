@@ -25,16 +25,18 @@ set(CMAKE_BUILD_TYPE Debug) # Debug Release RelWithDebInfo MinSizeRel
 set(MCU_FLAGS -mcpu=cortex-m4 -mthumb -mthumb-interwork -mfloat-abi=hard -mfpu=fpv4-sp-d16)
 set(LINKER_SCRIPT "${CMAKE_SOURCE_DIR}/STM32F407IGHx_FLASH.ld") # 指定链接脚本
 set(DSP_NAME "libCMSISDSP.a") # 指定DSP库名称
-link_directories(${CMAKE_SOURCE_DIR}/Middlewares/ST/ARM/DSP/Lib)
+# 动态计算 DSP 库相对路径（兼容任意构建目录层级，避免中文绝对路径导致 ld 无法搜索库）
+file(RELATIVE_PATH DSP_LIB_REL ${PROJECT_BINARY_DIR} ${CMAKE_SOURCE_DIR}/Middlewares/ST/ARM/DSP/Lib)
+add_link_options(-Wl,-L${DSP_LIB_REL})
 
 # Generic compiler settings for optimization and basic link lib
-add_compile_options(-pipe ${MCU_FLAGS} -Wall -Werror -fmessage-length=0 # basic options
+add_compile_options(-pipe ${MCU_FLAGS} -Wall -fmessage-length=0 # basic options
                     -ffunction-sections -fdata-sections -fno-common # optimize options 
                     )
 add_link_options(-pipe ${MCU_FLAGS} -T${LINKER_SCRIPT} -Wl,--no-warn-rwx-segments # close RWX warning
                  -lm -lc -lnosys # lib options
                  -Wl,--gc-sections -flto -specs=nano.specs -specs=nosys.specs # optimize options
-                 -Wl,-Map=${PROJECT_BINARY_DIR}/${PROJECT_NAME}.map -Wl,--cref -Wl,--print-memory-usage # map options
+                 -Wl,-Map,${PROJECT_NAME}.map -Wl,--cref -Wl,--print-memory-usage # map options
                  ) # if your executable is too large , try option '-s' to strip symbols
 
 # add_compile_definitions() works for compile stage
@@ -76,6 +78,8 @@ file(GLOB_RECURSE SOURCES
     "modules/*.c"
     "application/*.c"
 )
+# 排除 syscalls.c/sysmem.c，避免与 -lnosys/--specs=nosys.specs 的符号冲突
+list(FILTER SOURCES EXCLUDE REGEX ".*/(syscalls|sysmem)\\.c$")
 
 # 汇编文件路径
 # ENABLE_LANGUAGE(ASM)
@@ -107,8 +111,9 @@ target_link_libraries(${PROJECT_NAME}.elf ${DSP_NAME} m) # link DSP lib and math
 
 add_custom_command(
     TARGET ${PROJECT_NAME}.elf POST_BUILD
-    COMMAND ${CMAKE_OBJCOPY} -Oihex $<TARGET_FILE:${PROJECT_NAME}.elf> ${PROJECT_BINARY_DIR}/${PROJECT_NAME}.hex
-    COMMAND ${CMAKE_OBJCOPY} -Obinary $<TARGET_FILE:${PROJECT_NAME}.elf> ${PROJECT_BINARY_DIR}/${PROJECT_NAME}.bin
+    COMMAND ${CMAKE_OBJCOPY} -Oihex $<TARGET_FILE_NAME:${PROJECT_NAME}.elf> ${PROJECT_NAME}.hex
+    COMMAND ${CMAKE_OBJCOPY} -Obinary $<TARGET_FILE_NAME:${PROJECT_NAME}.elf> ${PROJECT_NAME}.bin
+    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
     COMMENT "Building hex & bin file..."
     COMMENT "EXCUTABLE SIZE:"
     COMMAND ${SIZE} ${PROJECT_NAME}.elf

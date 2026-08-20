@@ -12,6 +12,7 @@
 #if defined(ONE_BOARD) || defined(CHASSIS_BOARD)
 #include "chassis.h"
 #endif
+// #include "my_motor.h"
 
 #if defined(ONE_BOARD) || defined(GIMBAL_BOARD)
 #include "gimbal.h"
@@ -31,14 +32,15 @@ void RobotInit()
 
 #if defined(ONE_BOARD) || defined(GIMBAL_BOARD)
     RobotCMDInit();
-    // GimbalInit();
-    // ShootInit();
+    GimbalInit();
+    ShootInit();
 #endif
 
 #if defined(ONE_BOARD) || defined(CHASSIS_BOARD)
     ChassisInit();
 #endif
 
+    // MyMotorInit();
     OSTaskInit(); // 创建基础任务
 
     // 初始化完成,开启中断
@@ -49,12 +51,13 @@ void RobotTask()
 {
 #if defined(ONE_BOARD) || defined(GIMBAL_BOARD)
     RobotCMDTask();
-    // GimbalTask();
-    // ShootTask();
+    GimbalTask();
+    ShootTask();
 #endif
 
 #if defined(ONE_BOARD) || defined(CHASSIS_BOARD)
     ChassisTask();
 #endif
 
+    // MyMotorControl();
 }

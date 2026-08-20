@@ -1,19 +1,15 @@
 {
     "configurations": [
         {
-            "name": "Win32",
+            "name": "STM32F407",
             "includePath": [
                 "${workspaceFolder}/**"
             ],
-            "defines": [
-                "_DEBUG",
-                "UNICODE",
-                "_UNICODE"
-            ],
+            "defines": [],
             "cStandard": "c17",
             "cppStandard": "gnu++14",
-            "intelliSenseMode": "windows-gcc-x86",
-            "configurationProvider": "ms-vscode.makefile-tools"
+            "intelliSenseMode": "gcc-arm",
+            "compileCommands": "${workspaceFolder}/build/Debug/compile_commands.json"
         }
     ],
     "version": 4

@@ -22,7 +22,7 @@
 #include "bsp_dwt.h"
 #include "referee_UI.h"
 #include "arm_math.h"
-
+#include "remote_control.h"
 /* 根据robot_def.h中的macro自动计算的参数 */
 #define HALF_WHEEL_BASE (WHEEL_BASE / 2.0f)     // 半轴距
 #define HALF_TRACK_WIDTH (TRACK_WIDTH / 2.0f)   // 半轮距
@@ -33,6 +33,7 @@
 #include "can_comm.h"
 #include "ins_task.h"
 static CANCommInstance *chasiss_can_comm; // 双板通信CAN comm
+static RC_ctrl_t *rc_data;
 attitude_t *Chassis_IMU_data;
 #endif // CHASSIS_BOARD
 #ifdef ONE_BOARD
@@ -132,6 +133,7 @@ void ChassisInit()
         .send_data_len = sizeof(Chassis_Upload_Data_s),
     };
     chasiss_can_comm = CANCommInit(&comm_conf); // can comm初始化
+    rc_data = RemoteControlInit(&huart3);
 #endif                                          // CHASSIS_BOARD
 
 #ifdef ONE_BOARD // 单板控制整车,则通过pubsub来传递消息
@@ -194,7 +196,25 @@ void ChassisTask()
     SubGetMessage(chassis_sub, &chassis_cmd_recv);
 #endif
 #ifdef CHASSIS_BOARD
-    chassis_cmd_recv = *(Chassis_Ctrl_Cmd_s *)CANCommGet(chasiss_can_comm);
+    // chassis_cmd_recv = *(Chassis_Ctrl_Cmd_s *)CANCommGet(chasiss_can_comm);
+    // 单板场景：无云台板发CAN命令，改为直接解析SBUS遥控器
+    if (rc_data[TEMP].rc.dial > 300)                       // 拨轮下拨过半 → 急停
+    {
+        chassis_cmd_recv.chassis_mode = CHASSIS_ZERO_FORCE;
+    }
+    else
+    {
+        chassis_cmd_recv.vx = 10.0f * (float)rc_data[TEMP].rc.rocker_r_;   // 右摇杆水平 → 前进
+        chassis_cmd_recv.vy = 10.0f * (float)rc_data[TEMP].rc.rocker_r1;   // 右摇杆竖直 → 横移
+        chassis_cmd_recv.offset_angle = 0.0f;              // 单板无云台，夹角恒为0
+
+        if (switch_is_down(rc_data[TEMP].rc.switch_right))       // 右开关[下] → 自旋
+            chassis_cmd_recv.chassis_mode = CHASSIS_ROTATE;
+        else if (switch_is_mid(rc_data[TEMP].rc.switch_right))   // 右开关[中] → 全向平移
+            chassis_cmd_recv.chassis_mode = CHASSIS_NO_FOLLOW;
+        else                                                     // 右开关[上] → 急停
+            chassis_cmd_recv.chassis_mode = CHASSIS_ZERO_FORCE;
+    }
 #endif // CHASSIS_BOARD
 
     SetPowerLimit(referee_data->GameRobotState.chassis_power_limit);//设置功率限制
