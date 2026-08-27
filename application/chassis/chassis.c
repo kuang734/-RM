@@ -17,7 +17,7 @@
 #include "super_cap.h"
 #include "message_center.h"
 #include "referee_task.h"
-
+#include "dji_motor.h"
 #include "general_def.h"
 #include "bsp_dwt.h"
 #include "referee_UI.h"
@@ -35,6 +35,8 @@
 static CANCommInstance *chasiss_can_comm; // 双板通信CAN comm
 static RC_ctrl_t *rc_data;
 attitude_t *Chassis_IMU_data;
+static DJIMotorInstance *yaw_motor; // 底盘板yaw电机(GM6020, can2)
+static DJIMotorInstance *loader_motor; // 底盘板拨盘电机(M3508, can2)
 #endif // CHASSIS_BOARD
 #ifdef ONE_BOARD
 static Publisher_t *chassis_pub;                    // 用于发布底盘的数据
@@ -123,9 +125,82 @@ void ChassisInit()
 #ifdef CHASSIS_BOARD
     Chassis_IMU_data = INS_Init(); // 底盘IMU初始化
 
+    // YAW (GM6020, 底盘板 can2, id=1)
+    Motor_Init_Config_s yaw_config = {
+        .can_init_config = {
+            .can_handle = &hcan2,
+            .tx_id = 1,
+        },
+        .controller_param_init_config = {
+            .angle_PID = {
+                .Kp = 8, // 8
+                .Ki = 0,
+                .Kd = 0,
+                .DeadBand = 0.1,
+                .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
+                .IntegralLimit = 100,
+                .MaxOut = 500,
+            },
+            .speed_PID = {
+                .Kp = 50,  // 50
+                .Ki = 200, // 200
+                .Kd = 0,
+                .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
+                .IntegralLimit = 3000,
+                .MaxOut = 20000,
+            },
+            .other_angle_feedback_ptr = &Chassis_IMU_data->YawTotalAngle,
+            .other_speed_feedback_ptr = &Chassis_IMU_data->Gyro[2],
+        },
+        .controller_setting_init_config = {
+            .angle_feedback_source = OTHER_FEED,
+            .speed_feedback_source = OTHER_FEED,
+            .outer_loop_type = ANGLE_LOOP,
+            .close_loop_type = ANGLE_LOOP | SPEED_LOOP,
+            .motor_reverse_flag = MOTOR_DIRECTION_NORMAL,
+        },
+        .motor_type = GM6020,
+    };
+    yaw_motor = DJIMotorInit(&yaw_config);
+
+    // 拨盘电机 (M3508, 底盘板 can2, id=2)
+    Motor_Init_Config_s loader_config = {
+        .can_init_config = {
+            .can_handle = &hcan2,
+            .tx_id = 2,
+        },
+        .controller_param_init_config = {
+            .speed_PID = {
+                .Kp = 10, // 10
+                .Ki = 1,  // 1
+                .Kd = 0,
+                .Improve = PID_Integral_Limit,
+                .IntegralLimit = 5000,
+                .MaxOut = 5000,
+            },
+            .current_PID = {
+                .Kp = 0.7, // 0.7
+                .Ki = 0.1, // 0.1
+                .Kd = 0,
+                .Improve = PID_Integral_Limit,
+                .IntegralLimit = 10000,
+                .MaxOut = 15000,
+            },
+        },
+        .controller_setting_init_config = {
+            .angle_feedback_source = MOTOR_FEED,
+            .speed_feedback_source = MOTOR_FEED,
+            .outer_loop_type = SPEED_LOOP,
+            .close_loop_type = SPEED_LOOP | CURRENT_LOOP,
+            .motor_reverse_flag = MOTOR_DIRECTION_NORMAL,
+        },
+        .motor_type = M3508,
+    };
+    loader_motor = DJIMotorInit(&loader_config);
+
     CANComm_Init_Config_s comm_conf = {
         .can_config = {
-            .can_handle = &hcan2,
+            .can_handle = &hcan1,
             .tx_id = 0x311,
             .rx_id = 0x312,
         },
@@ -186,7 +261,6 @@ static void EstimateSpeed()
     // chassis_feedback_data.vx vy wz =
     //  ...
 }
-
 /* 机器人底盘控制核心任务 */
 void ChassisTask()
 {
@@ -218,6 +292,7 @@ void ChassisTask()
 #endif // CHASSIS_BOARD
 
     SetPowerLimit(referee_data->GameRobotState.chassis_power_limit);//设置功率限制
+
     if (chassis_cmd_recv.chassis_mode == CHASSIS_ZERO_FORCE)
     { // 如果出现重要模块离线或遥控器设置为急停,让电机停止
         DJIMotorStop(motor_lf);

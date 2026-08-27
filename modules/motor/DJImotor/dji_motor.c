@@ -148,6 +148,7 @@ static void DecodeDJIMotor(CANInstance *_instance)
     measure->total_angle = measure->total_round * 360 + measure->angle_single_round;
 }
 
+
 static void DJIMotorLostCallback(void *motor_ptr)
 {
     DJIMotorInstance *motor = (DJIMotorInstance *)motor_ptr;

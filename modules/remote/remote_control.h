@@ -130,4 +130,11 @@ RC_ctrl_t *RemoteControlInit(UART_HandleTypeDef *rc_usart_handle);
  */
 uint8_t RemoteControlIsOnline();
 
+/**
+ * @brief 获取已初始化的遥控器数据指针(不重复初始化USART)
+ *
+ * @return RC_ctrl_t* 遥控器数据结构指针
+ */
+RC_ctrl_t *GetRemoteControlData(void);
+
 #endif

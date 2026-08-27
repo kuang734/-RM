@@ -13,6 +13,7 @@
 #include "master_process.h"
 #include "daemon.h"
 #include "HT04.h"
+#include "dmmotor.h"
 #include "buzzer.h"
 
 #include "bsp_log.h"
@@ -52,6 +53,7 @@ void OSTaskInit()
     uiTaskHandle = osThreadCreate(osThread(uitask), NULL);
 
     HTMotorControlInit(); // 没有注册HT电机则不会执行
+    DMMotorControlInit(); // 没有注册达妙电机则不会执行(GimbalInit已先于OSTaskInit创建电机实例)
 }
 
 __attribute__((noreturn)) void StartINSTASK(void const *argument)

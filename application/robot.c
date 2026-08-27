@@ -12,8 +12,6 @@
 #if defined(ONE_BOARD) || defined(CHASSIS_BOARD)
 #include "chassis.h"
 #endif
-// #include "my_motor.h"
-
 #if defined(ONE_BOARD) || defined(GIMBAL_BOARD)
 #include "gimbal.h"
 #include "shoot.h"
@@ -40,7 +38,6 @@ void RobotInit()
     ChassisInit();
 #endif
 
-    // MyMotorInit();
     OSTaskInit(); // 创建基础任务
 
     // 初始化完成,开启中断
@@ -59,5 +56,4 @@ void RobotTask()
     ChassisTask();
 #endif
 
-    // MyMotorControl();
 }

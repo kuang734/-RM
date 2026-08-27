@@ -26,6 +26,7 @@ typedef struct
     float T_Mos;
     float T_Rotor;
     int32_t total_round;
+    float total_angle;   // 多圈累计角度, 单位 rad = total_round*2π + position
 }DM_Motor_Measure_s;
 
 typedef struct

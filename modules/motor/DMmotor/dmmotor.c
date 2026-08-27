@@ -53,6 +53,14 @@ static void DMMotorDecode(CANInstance *motor_can)
 
     measure->T_Mos = (float)rxbuff[6];
     measure->T_Rotor = (float)rxbuff[7];
+
+    // 多圈累计: 相邻两帧位置差超过半圈(π)视为跨过零位翻转
+    float d_pos = measure->position - measure->last_position;
+    if (d_pos >  PI)
+        measure->total_round--;
+    else if (d_pos < -PI)
+        measure->total_round++;
+    measure->total_angle = (float)measure->total_round * 2.0f * PI + measure->position;
 }
 
 static void DMMotorLostCallback(void *motor_ptr)
@@ -137,7 +145,7 @@ void DMMotorTask(void const *argument)
         LIMIT_MIN_MAX(set, DM_T_MIN, DM_T_MAX);
         motor_send_mailbox.position_des = float_to_uint(0, DM_P_MIN, DM_P_MAX, 16);
         motor_send_mailbox.velocity_des = float_to_uint(0, DM_V_MIN, DM_V_MAX, 12);
-        motor_send_mailbox.torque_des = float_to_uint(pid_ref, DM_T_MIN, DM_T_MAX, 12);
+        motor_send_mailbox.torque_des = float_to_uint(set, DM_T_MIN, DM_T_MAX, 12);
         motor_send_mailbox.Kp = 0;
         motor_send_mailbox.Kd = 0;
 
